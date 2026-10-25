@@ -30,6 +30,7 @@ import {
   saveCachedQuestions,
   saveCachedResults,
   saveCachedConfig,
+  fetchServerExamConfig,
   clearCachedResults,
   clearAllResultsFromSheet,
   deleteSingleResultFromSheet,
@@ -75,14 +76,22 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Sync with Google Sheets:
+  // Sync with Google Sheets & Server Config:
   // - Data_Peserta -> Aktivitas & Status Peserta
   // - Data_Login   -> Menu Data Peserta
   // - Soal_Test    -> Bank Soal
   // - Hasil_Jawaban -> Skor & Peringkat Juara
+  // - Server Exam Config -> Real-time Duration & KKM
   const syncDataFromSheets = useCallback(async (silent: boolean = false) => {
     setSyncStatus((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
+      // Sync live exam config from server database / API
+      fetchServerExamConfig().then((serverCfg) => {
+        if (serverCfg) {
+          setConfig(serverCfg);
+        }
+      });
+
       const [fetchedPeserta, fetchedLogin, fetchedQuestions, fetchedResults] = await Promise.all([
         fetchDataPesertaFromSheet(),
         fetchDataLoginFromSheet(),

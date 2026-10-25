@@ -15,16 +15,35 @@ const RESULTS_BACKUP_FILE = path.resolve('/tmp', 'cbt_exam_results_backup.json')
 
 const CONFIG_FILE = path.resolve('/tmp', 'cbt_server_config.json');
 
+interface ExamConfig {
+  durasiMenit: number;
+  passingGrade: number;
+  acakSoal: boolean;
+  judulUjian: string;
+  lokasiCabang: string;
+  isExamOpen: boolean;
+}
+
 interface ServerConfig {
   appsScriptUrl: string;
   spreadsheetId: string;
   spreadsheetUrl: string;
   googleAuthToken?: string;
+  examConfig?: ExamConfig;
 }
 
 const DEFAULT_SPREADSHEET_ID = '1Rxb_sZGIgmUFhLhMVG65I-qpdi-v1tpj_c2tAZHsKiQ';
 const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1Rxb_sZGIgmUFhLhMVG65I-qpdi-v1tpj_c2tAZHsKiQ/edit?gid=537994683#gid=537994683';
 const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmif0OC750DvnqekRcCSJ1JLNCmu--5Pe-pSaig78OL9oOPaFPxB9Cek45GyB8Mfx4/exec';
+
+const DEFAULT_EXAM_CONFIG: ExamConfig = {
+  durasiMenit: 20,
+  passingGrade: 70,
+  acakSoal: false,
+  judulUjian: 'Training CSCI',
+  lokasiCabang: 'Indomaret Cabang Surabaya',
+  isExamOpen: true,
+};
 
 function readServerConfig(): ServerConfig {
   try {
@@ -38,6 +57,7 @@ function readServerConfig(): ServerConfig {
         spreadsheetId: (isOldId || !parsed.spreadsheetId) ? DEFAULT_SPREADSHEET_ID : parsed.spreadsheetId,
         spreadsheetUrl: (isOldId || !parsed.spreadsheetUrl) ? DEFAULT_SPREADSHEET_URL : parsed.spreadsheetUrl,
         googleAuthToken: parsed.googleAuthToken || undefined,
+        examConfig: parsed.examConfig ? { ...DEFAULT_EXAM_CONFIG, ...parsed.examConfig } : DEFAULT_EXAM_CONFIG,
       };
     }
   } catch (e) {
@@ -47,6 +67,7 @@ function readServerConfig(): ServerConfig {
     appsScriptUrl: DEFAULT_APPS_SCRIPT_URL,
     spreadsheetId: DEFAULT_SPREADSHEET_ID,
     spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
+    examConfig: DEFAULT_EXAM_CONFIG,
   };
 }
 
@@ -164,6 +185,40 @@ app.get('/api/sheets/config', (req: Request, res: Response) => {
     spreadsheetUrl: serverConfig.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
     hasWebhook: Boolean(serverConfig.appsScriptUrl),
     hasGoogleAuthToken: Boolean(serverConfig.googleAuthToken),
+    examConfig: serverConfig.examConfig || DEFAULT_EXAM_CONFIG,
+  });
+});
+
+// API: Get Server Exam Config (Live duration & KKM for participants)
+app.get('/api/exam/config', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    config: serverConfig.examConfig || DEFAULT_EXAM_CONFIG,
+  });
+});
+
+// API: Save Server Exam Config (Applies live across all participant devices)
+app.post('/api/exam/config', (req: Request, res: Response) => {
+  const { config } = req.body;
+  if (!config || typeof config !== 'object') {
+    return res.status(400).json({ success: false, message: 'Data konfigurasi tidak valid.' });
+  }
+
+  const updatedConfig: ExamConfig = {
+    durasiMenit: Math.max(1, Number(config.durasiMenit) || 20),
+    passingGrade: Math.min(100, Math.max(0, Number(config.passingGrade) || 70)),
+    acakSoal: Boolean(config.acakSoal),
+    judulUjian: typeof config.judulUjian === 'string' && config.judulUjian.trim() ? config.judulUjian.trim() : 'Training CSCI',
+    lokasiCabang: typeof config.lokasiCabang === 'string' && config.lokasiCabang.trim() ? config.lokasiCabang.trim() : 'Indomaret Cabang Surabaya',
+    isExamOpen: config.isExamOpen !== undefined ? Boolean(config.isExamOpen) : true,
+  };
+
+  saveServerConfig({ examConfig: updatedConfig });
+
+  return res.json({
+    success: true,
+    message: 'Pengaturan ujian (Durasi, KKM, Status) berhasil disimpan di server dan diterapkan ke seluruh peserta!',
+    config: serverConfig.examConfig,
   });
 });
 

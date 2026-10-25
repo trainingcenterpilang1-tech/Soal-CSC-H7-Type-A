@@ -863,6 +863,60 @@ export const saveCachedConfig = (config: ExamConfig) => {
   }
 };
 
+export const fetchServerExamConfig = async (): Promise<ExamConfig | null> => {
+  try {
+    const res = await fetch('/api/exam/config', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.config) {
+        saveCachedConfig(data.config);
+        return data.config;
+      }
+    }
+  } catch (err) {
+    console.warn('[Config] Error fetching server exam config:', err);
+  }
+  return null;
+};
+
+export const saveServerExamConfig = async (config: ExamConfig): Promise<{
+  success: boolean;
+  message: string;
+  config: ExamConfig;
+}> => {
+  saveCachedConfig(config);
+  triggerAppSync();
+
+  try {
+    const res = await fetch('/api/exam/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.config) {
+        saveCachedConfig(data.config);
+        triggerAppSync();
+        return {
+          success: true,
+          message: data.message || 'Pengaturan ujian berhasil disimpan di server dan diterapkan ke seluruh peserta!',
+          config: data.config,
+        };
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Config] Failed to save server exam config:', err);
+  }
+
+  return {
+    success: true,
+    message: 'Pengaturan ujian berhasil disimpan di perangkat ini dan disinkronkan!',
+    config,
+  };
+};
+
 export const SYNC_EVENT_NAME = 'stm_realtime_sync_event';
 
 export const triggerAppSync = () => {

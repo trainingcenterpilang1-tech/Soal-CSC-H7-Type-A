@@ -102,7 +102,7 @@ export const ParticipantLogin: React.FC<ParticipantLoginProps> = ({
     }
   };
 
-  const handleStartExam = (type: 'Pre Test' | 'Post Test') => {
+  const handleStartExam = (type: 'Pre Test' | 'Post Test' | 'Remedial 1' | 'Remedial 2') => {
     if (!authenticatedUser) return;
 
     if (!selectedJabatan) {
@@ -431,30 +431,50 @@ export const ParticipantLogin: React.FC<ParticipantLoginProps> = ({
               </button>
             </div>
           ) : (
-            /* 2 Tombol Pilihan: Pre Test dan Post Test */
+            /* 4 Tombol Pilihan: Pre Test, Post Test, Remedial 1, dan Remedial 2 */
             <div className="space-y-3 pt-1">
               <span className="block text-xs font-bold text-slate-700 text-center">
                 Pilih Jenis Ujian untuk Mulai Mengerjakan:
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   id="btn-pre-test"
                   type="button"
                   onClick={() => handleStartExam('Pre Test')}
-                  className="w-full py-3.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-3 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <BookOpen className="w-4 h-4 text-indigo-200" />
-                  <span>Mulai Pre Test</span>
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-200 shrink-0" />
+                  <span>Pre Test</span>
                 </button>
 
                 <button
                   id="btn-post-test"
                   type="button"
                   onClick={() => handleStartExam('Post Test')}
-                  className="w-full py-3.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-3 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4 text-amber-300" />
-                  <span>Mulai Post Test</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  <span>Post Test</span>
+                </button>
+
+                <button
+                  id="btn-remedial-1"
+                  type="button"
+                  onClick={() => handleStartExam('Remedial 1')}
+                  className="w-full py-3 px-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Clock className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+                  <span>Remedial 1</span>
+                </button>
+
+                <button
+                  id="btn-remedial-2"
+                  type="button"
+                  onClick={() => handleStartExam('Remedial 2')}
+                  className="w-full py-3 px-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-purple-200 shrink-0" />
+                  <span>Remedial 2</span>
                 </button>
               </div>
 

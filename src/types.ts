@@ -10,7 +10,7 @@ export interface Participant {
   status?: 'Belum Ujian' | 'Sedang Ujian' | 'Selesai';
   namaCOS?: string;
   namaTrainer?: string;
-  tipeUjian?: 'Pre Test' | 'Post Test';
+  tipeUjian?: 'Pre Test' | 'Post Test' | 'Remedial 1' | 'Remedial 2';
 }
 
 export interface Question {
@@ -55,7 +55,7 @@ export interface ExamResult {
   jawabanPerSoal?: Record<number, string>; // { 1: 'A', 2: 'B', ... }
   namaCOS?: string;
   namaTrainer?: string;
-  tipeUjian?: 'Pre Test' | 'Post Test';
+  tipeUjian?: 'Pre Test' | 'Post Test' | 'Remedial 1' | 'Remedial 2';
   syncedToSheet?: boolean;
   deliveredToGForm?: boolean;
   gformUrl?: string;

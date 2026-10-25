@@ -58,6 +58,7 @@ import {
   saveAdminPassword,
   resetAdminPassword,
   verifyAdminPassword,
+  saveServerExamConfig,
 } from '../lib/sheetsService';
 import { FIREBASE_PROJECT_ID } from '../lib/firebase';
 import { getCustomGFormUrl, saveCustomGFormUrl, resetCustomGFormUrl } from '../lib/gformService';
@@ -91,11 +92,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   const [activeAdminSubTab, setActiveAdminSubTab] = useState<'monitoring' | 'bank_soal' | 'spreadsheet' | 'pengaturan' | 'password_admin'>('monitoring');
   const [participantSearch, setParticipantSearch] = useState('');
+  const [examTypeFilter, setExamTypeFilter] = useState<'Semua' | 'Pre Test' | 'Post Test' | 'Remedial 1' | 'Remedial 2'>('Semua');
   const [questionSearch, setQuestionSearch] = useState('');
   const [activityPage, setActivityPage] = useState(1);
   const activityPageSize = 25;
   const [showResetResultsModal, setShowResetResultsModal] = useState(false);
   const [showImageGuide, setShowImageGuide] = useState(false);
+
+  // Real-time Server Exam Config Saving State
+  const [isSavingConfig, setIsSavingConfig] = useState<boolean>(false);
+  const [configFeedback, setConfigFeedback] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleSaveExamConfigToServer = async () => {
+    setIsSavingConfig(true);
+    setConfigFeedback(null);
+    try {
+      const res = await saveServerExamConfig(config);
+      if (res.success) {
+        setConfigFeedback({
+          success: true,
+          message: 'Pengaturan Ujian berhasil disimpan ke Server & Cloud Database! Seluruh HP/Laptop peserta yang membuka aplikasi akan otomatis memakai durasi & KKM ini.',
+        });
+        onUpdateConfig(res.config || config);
+      } else {
+        setConfigFeedback({
+          success: false,
+          message: res.message || 'Gagal menyimpan pengaturan ke server.',
+        });
+      }
+    } catch (err: any) {
+      setConfigFeedback({
+        success: false,
+        message: err.message || 'Terjadi kesalahan saat menyimpan ke server.',
+      });
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
 
   // Admin Password Management State
   const [currentAdminPassword, setCurrentAdminPassword] = useState<string>(getAdminPassword());
@@ -431,11 +464,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     })
     .filter((p) => {
       const q = participantSearch.toLowerCase();
-      return (
+      const matchesSearch =
         p.nama.toLowerCase().includes(q) ||
         p.nik.toLowerCase().includes(q) ||
-        p.toko.toLowerCase().includes(q)
-      );
+        p.toko.toLowerCase().includes(q);
+
+      const currentTipe = p.examResult?.tipeUjian || p.tipeUjian;
+      const matchesExamType =
+        examTypeFilter === 'Semua' || currentTipe === examTypeFilter;
+
+      return matchesSearch && matchesExamType;
     });
 
   const totalActivityPages = Math.max(1, Math.ceil(participantActivityList.length / activityPageSize));
@@ -721,7 +759,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+              <select
+                value={examTypeFilter}
+                onChange={(e) => {
+                  setExamTypeFilter(e.target.value as any);
+                  setActivityPage(1);
+                }}
+                className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
+              >
+                <option value="Semua">Semua Jenis Ujian</option>
+                <option value="Pre Test">Pre Test</option>
+                <option value="Post Test">Post Test</option>
+                <option value="Remedial 1">Remedial 1</option>
+                <option value="Remedial 2">Remedial 2</option>
+              </select>
+
               <div className="relative flex-1 sm:w-64">
                 <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
                 <input
@@ -862,7 +915,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               tipeUjian === 'Pre Test'
                                 ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-                                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : tipeUjian === 'Post Test'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : tipeUjian === 'Remedial 1'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-purple-100 text-purple-800 border border-purple-200'
                             }`}>
                               {tipeUjian}
                             </span>
@@ -1727,12 +1784,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Sub Tab 4: Pengaturan Ujian */}
       {activeAdminSubTab === 'pengaturan' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl">
-          <h3 className="text-base font-bold text-slate-900 mb-1">
-            Konfigurasi Parameter Ujian
-          </h3>
-          <p className="text-xs text-slate-500 mb-6">
-            Atur durasi waktu pengerjaan dan ambang batas kelulusan (KKM)
-          </p>
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Konfigurasi Parameter Ujian Realtime
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Atur durasi waktu pengerjaan, standar kelulusan KKM, dan status pintu ujian untuk seluruh peserta.
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+              Sinkron Real-Time Cloud
+            </span>
+          </div>
+
+          {configFeedback && (
+            <div
+              className={`mb-5 p-3.5 rounded-xl border text-xs font-semibold flex items-start gap-2.5 ${
+                configFeedback.success
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-rose-50 border-rose-200 text-rose-800'
+              }`}
+            >
+              {configFeedback.success ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              )}
+              <span>{configFeedback.message}</span>
+            </div>
+          )}
 
           <div className="space-y-5">
             <div>
@@ -1755,21 +1836,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="relative">
                   <input
                     type="number"
-                    min="5"
-                    max="120"
+                    min="1"
+                    max="180"
                     value={config.durasiMenit}
                     onChange={(e) =>
                       onUpdateConfig({ ...config, durasiMenit: Number(e.target.value) || 20 })
                     }
-                    className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <Clock className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
                 </div>
+                <p className="text-[11px] text-slate-500 mt-1">Default: 20 menit</p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Standar Kelulusan / KKM (Skor)
+                  Standar Kelulusan / Nilai KKM (0-100)
                 </label>
                 <div className="relative">
                   <input
@@ -1778,16 +1860,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     max="100"
                     value={config.passingGrade}
                     onChange={(e) =>
-                      onUpdateConfig({ ...config, passingGrade: Number(e.target.value) || 75 })
+                      onUpdateConfig({ ...config, passingGrade: Number(e.target.value) || 70 })
                     }
-                    className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <Award className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
                 </div>
+                <p className="text-[11px] text-slate-500 mt-1">Default: 70 (skala 0–100)</p>
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="space-y-3 pt-2 border-t border-slate-100">
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -1796,9 +1879,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-xs font-semibold text-slate-800">
-                  Buka Pintu Ujian (Peserta dapat langsung mulai mengerjakan)
+                  Buka Pintu Ujian (Peserta dapat langsung memilih jenis ujian &amp; mulai mengerjakan)
                 </span>
               </label>
+
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.isRandomizeQuestions ?? true}
+                  onChange={(e) => onUpdateConfig({ ...config, isRandomizeQuestions: e.target.checked })}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-xs font-semibold text-slate-800">
+                  Acak Urutan Soal Ujian untuk Setiap Peserta
+                </span>
+              </label>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={handleSaveExamConfigToServer}
+                disabled={isSavingConfig}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Send className={`w-4 h-4 ${isSavingConfig ? 'animate-spin' : ''}`} />
+                <span>{isSavingConfig ? 'Menyimpan & Menerapkan...' : 'Simpan & Terapkan Pengaturan ke Seluruh Peserta'}</span>
+              </button>
             </div>
           </div>
         </div>
