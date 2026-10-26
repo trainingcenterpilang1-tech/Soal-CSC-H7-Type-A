@@ -1853,7 +1853,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                   <Clock className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">Default: 15 menit</p>
+                <p className="text-[11px] text-slate-500 mt-1">Default: 20 menit</p>
               </div>
 
               <div>

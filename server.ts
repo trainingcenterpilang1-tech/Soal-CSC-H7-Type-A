@@ -38,7 +38,7 @@ const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1Rxb_sZG
 const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmif0OC750DvnqekRcCSJ1JLNCmu--5Pe-pSaig78OL9oOPaFPxB9Cek45GyB8Mfx4/exec';
 
 const DEFAULT_EXAM_CONFIG: ExamConfig = {
-  durasiMenit: 15,
+  durasiMenit: 20,
   passingGrade: 70,
   acakSoal: false,
   isRandomizeQuestions: false,
@@ -88,6 +88,31 @@ function saveServerConfig(cfg: Partial<ServerConfig>): void {
 if (!fs.existsSync(CONFIG_FILE)) {
   saveServerConfig(serverConfig);
 }
+
+// Automatically sync persistent exam config from Supabase Cloud Database on server startup
+async function syncConfigFromSupabase() {
+  try {
+    const res = await fetch(`${PERMANENT_SUPABASE_URL}/rest/v1/Data_Peserta?select=nama&nip=eq.__CONFIG_EXAM__`, {
+      headers: {
+        'apikey': PERMANENT_SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${PERMANENT_SUPABASE_ANON_KEY}`,
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data[0]?.nama) {
+        const parsed = JSON.parse(data[0].nama);
+        if (parsed && typeof parsed === 'object') {
+          saveServerConfig({ examConfig: { ...DEFAULT_EXAM_CONFIG, ...parsed } });
+          console.log('[Server] Successfully synchronized live exam config from Supabase Cloud Database:', parsed);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[Server] Supabase config sync error:', e);
+  }
+}
+syncConfigFromSupabase();
 
 function resolveScriptUrl(url?: string): string {
   if (url && typeof url === 'string' && url.trim().startsWith('https://script.google.com/')) {
@@ -224,6 +249,17 @@ app.post('/api/exam/config', (req: Request, res: Response) => {
   };
 
   saveServerConfig({ examConfig: updatedConfig });
+
+  // Also push to Supabase Cloud Database row (__CONFIG_EXAM__)
+  fetch(`${PERMANENT_SUPABASE_URL}/rest/v1/Data_Peserta?nip=eq.__CONFIG_EXAM__`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': PERMANENT_SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${PERMANENT_SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ nama: JSON.stringify(updatedConfig) }),
+  }).catch(() => {});
 
   return res.json({
     success: true,

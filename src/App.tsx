@@ -85,19 +85,18 @@ export default function App() {
   const syncDataFromSheets = useCallback(async (silent: boolean = false) => {
     setSyncStatus((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
-      // Sync live exam config from server database / API
-      fetchServerExamConfig().then((serverCfg) => {
-        if (serverCfg) {
-          setConfig(serverCfg);
-        }
-      });
-
-      const [fetchedPeserta, fetchedLogin, fetchedQuestions, fetchedResults] = await Promise.all([
+      // Sync live exam config & participants from Cloud Database & Google Sheets
+      const [serverCfg, fetchedPeserta, fetchedLogin, fetchedQuestions, fetchedResults] = await Promise.all([
+        fetchServerExamConfig(),
         fetchDataPesertaFromSheet(),
         fetchDataLoginFromSheet(),
         fetchQuestionsFromSheet(),
         fetchResultsFromSheet(),
       ]);
+
+      if (serverCfg) {
+        setConfig(serverCfg);
+      }
 
       // Synchronize both dataPeserta and dataLogin from Supabase Data_Peserta
       const activePesertaList = fetchedLogin.length > 0 ? fetchedLogin : fetchedPeserta;
@@ -172,13 +171,20 @@ export default function App() {
 
   // Fetch live sheets data immediately on mount and setup auto-sync
   useEffect(() => {
+    // 1. Immediately fetch latest live configuration from Cloud Database
+    fetchServerExamConfig().then((serverCfg) => {
+      if (serverCfg) {
+        setConfig(serverCfg);
+      }
+    });
+
     syncServerSpreadsheetConfig();
     syncDataFromSheets(true);
 
-    // 1. Periodic background polling every 8 seconds
+    // 2. Periodic background polling every 5 seconds
     const pollInterval = setInterval(() => {
       syncDataFromSheets(true);
-    }, 8000);
+    }, 5000);
 
     // 2. Trigger sync on window focus & tab visibility change
     const handleFocus = () => syncDataFromSheets(true);

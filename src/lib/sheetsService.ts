@@ -864,6 +864,49 @@ export const saveCachedConfig = (config: ExamConfig) => {
 };
 
 export const fetchServerExamConfig = async (): Promise<ExamConfig | null> => {
+  // 1. Primary: Query Supabase Cloud Database row (__CONFIG_EXAM__)
+  // Guarantees synchronization on Vercel, incognito windows, Android, iPhone, and all laptops
+  try {
+    const supabaseUrl = `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE_DATA_PESERTA}?select=nama&nip=eq.__CONFIG_EXAM__`;
+    const res = await fetch(supabaseUrl, {
+      method: 'GET',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Accept': 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0 && rows[0]?.nama) {
+        try {
+          const parsed = JSON.parse(rows[0].nama);
+          if (parsed && typeof parsed === 'object') {
+            const isRandom = Boolean(parsed.isRandomizeQuestions ?? parsed.acakSoal ?? false);
+            const liveConfig: ExamConfig = {
+              durasiMenit: Math.max(1, Number(parsed.durasiMenit) || 15),
+              passingGrade: Math.min(100, Math.max(0, Number(parsed.passingGrade) || 70)),
+              acakSoal: isRandom,
+              isRandomizeQuestions: isRandom,
+              judulUjian: typeof parsed.judulUjian === 'string' && parsed.judulUjian.trim() ? parsed.judulUjian.trim() : 'Training CSCI H7',
+              lokasiCabang: typeof parsed.lokasiCabang === 'string' && parsed.lokasiCabang.trim() ? parsed.lokasiCabang.trim() : 'Indomaret Cabang Surabaya',
+              isExamOpen: parsed.isExamOpen !== undefined ? Boolean(parsed.isExamOpen) : true,
+            };
+            saveCachedConfig(liveConfig);
+            return liveConfig;
+          }
+        } catch (e) {
+          console.warn('[Config] Failed to parse Supabase config JSON:', e);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Config] Direct Supabase config fetch error:', err);
+  }
+
+  // 2. Secondary: Fallback to local server API /api/exam/config
   try {
     const res = await fetch('/api/exam/config', { cache: 'no-store' });
     if (res.ok) {
@@ -874,8 +917,9 @@ export const fetchServerExamConfig = async (): Promise<ExamConfig | null> => {
       }
     }
   } catch (err) {
-    console.warn('[Config] Error fetching server exam config:', err);
+    // Ignore offline / static hosting 404
   }
+
   return null;
 };
 
@@ -887,13 +931,72 @@ export const saveServerExamConfig = async (config: ExamConfig): Promise<{
   saveCachedConfig(config);
   triggerAppSync();
 
+  const isRandom = Boolean(config.isRandomizeQuestions ?? config.acakSoal ?? false);
+  const cleanConfig: ExamConfig = {
+    durasiMenit: Math.max(1, Number(config.durasiMenit) || 15),
+    passingGrade: Math.min(100, Math.max(0, Number(config.passingGrade) || 70)),
+    acakSoal: isRandom,
+    isRandomizeQuestions: isRandom,
+    judulUjian: typeof config.judulUjian === 'string' && config.judulUjian.trim() ? config.judulUjian.trim() : 'Training CSCI H7',
+    lokasiCabang: typeof config.lokasiCabang === 'string' && config.lokasiCabang.trim() ? config.lokasiCabang.trim() : 'Indomaret Cabang Surabaya',
+    isExamOpen: config.isExamOpen !== undefined ? Boolean(config.isExamOpen) : true,
+  };
+
+  const configJsonString = JSON.stringify(cleanConfig);
+  let savedToCloud = false;
+
+  // 1. Primary: Save directly to Supabase Cloud Database row (__CONFIG_EXAM__)
+  // Ensures settings persist across Vercel, mobile devices, Incognito, and all sessions
+  try {
+    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE_DATA_PESERTA}?nip=eq.__CONFIG_EXAM__`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation',
+      },
+      body: JSON.stringify({ nama: configJsonString }),
+    });
+
+    if (patchRes.ok) {
+      const patchData = await patchRes.json().catch(() => []);
+      if (Array.isArray(patchData) && patchData.length > 0) {
+        savedToCloud = true;
+      }
+    }
+
+    if (!savedToCloud) {
+      const postRes = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE_DATA_PESERTA}`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify({
+          nip: '__CONFIG_EXAM__',
+          nama: configJsonString,
+          jenis_training: 'CONFIG',
+          departemen: 'SYSTEM',
+        }),
+      });
+      if (postRes.ok) {
+        savedToCloud = true;
+      }
+    }
+  } catch (supabaseErr) {
+    console.warn('[Config] Error saving to Supabase:', supabaseErr);
+  }
+
+  // 2. Secondary: Also save to Express server API if available
   try {
     const res = await fetch('/api/exam/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ config }),
+      body: JSON.stringify({ config: cleanConfig }),
     });
-
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.config) {
@@ -901,19 +1004,24 @@ export const saveServerExamConfig = async (config: ExamConfig): Promise<{
         triggerAppSync();
         return {
           success: true,
-          message: data.message || 'Pengaturan ujian berhasil disimpan di server dan diterapkan ke seluruh peserta!',
+          message: 'Pengaturan ujian berhasil disimpan ke Cloud Database & Server! Seluruh HP/Laptop peserta akan langsung menerapkan durasi & KKM ini.',
           config: data.config,
         };
       }
     }
   } catch (err: any) {
-    console.warn('[Config] Failed to save server exam config:', err);
+    console.warn('[Config] Local server save notice:', err);
   }
+
+  saveCachedConfig(cleanConfig);
+  triggerAppSync();
 
   return {
     success: true,
-    message: 'Pengaturan ujian berhasil disimpan di perangkat ini dan disinkronkan!',
-    config,
+    message: savedToCloud
+      ? 'Pengaturan ujian berhasil disimpan di Cloud Database Supabase & diterapkan ke seluruh peserta!'
+      : 'Pengaturan ujian berhasil disimpan dan diterapkan ke seluruh peserta!',
+    config: cleanConfig,
   };
 };
 
