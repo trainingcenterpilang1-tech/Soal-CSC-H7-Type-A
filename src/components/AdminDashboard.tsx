@@ -103,17 +103,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isSavingConfig, setIsSavingConfig] = useState<boolean>(false);
   const [configFeedback, setConfigFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
+  // Local form state for Pengaturan Ujian so edits are preserved and not wiped by background polling
+  const [formConfig, setFormConfig] = useState<ExamConfig>(config);
+
+  React.useEffect(() => {
+    setFormConfig(config);
+  }, [config.durasiMenit, config.passingGrade, config.judulUjian, config.isExamOpen, config.isRandomizeQuestions, config.acakSoal]);
+
   const handleSaveExamConfigToServer = async () => {
     setIsSavingConfig(true);
     setConfigFeedback(null);
     try {
-      const res = await saveServerExamConfig(config);
+      const res = await saveServerExamConfig(formConfig);
       if (res.success) {
         setConfigFeedback({
           success: true,
           message: 'Pengaturan Ujian berhasil disimpan ke Server & Cloud Database! Seluruh HP/Laptop peserta yang membuka aplikasi akan otomatis memakai durasi & KKM ini.',
         });
-        onUpdateConfig(res.config || config);
+        onUpdateConfig(res.config || formConfig);
       } else {
         setConfigFeedback({
           success: false,
@@ -1822,8 +1829,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </label>
               <input
                 type="text"
-                value={config.judulUjian || 'Training Evabul SC'}
-                onChange={(e) => onUpdateConfig({ ...config, judulUjian: e.target.value })}
+                value={formConfig.judulUjian || 'Training CSCI H7'}
+                onChange={(e) => setFormConfig({ ...formConfig, judulUjian: e.target.value })}
                 className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -1838,15 +1845,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     type="number"
                     min="1"
                     max="180"
-                    value={config.durasiMenit}
+                    value={formConfig.durasiMenit}
                     onChange={(e) =>
-                      onUpdateConfig({ ...config, durasiMenit: Number(e.target.value) || 20 })
+                      setFormConfig({ ...formConfig, durasiMenit: Math.max(1, Number(e.target.value) || 15) })
                     }
                     className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <Clock className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">Default: 20 menit</p>
+                <p className="text-[11px] text-slate-500 mt-1">Default: 15 menit</p>
               </div>
 
               <div>
@@ -1858,9 +1865,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     type="number"
                     min="10"
                     max="100"
-                    value={config.passingGrade}
+                    value={formConfig.passingGrade}
                     onChange={(e) =>
-                      onUpdateConfig({ ...config, passingGrade: Number(e.target.value) || 70 })
+                      setFormConfig({ ...formConfig, passingGrade: Math.min(100, Math.max(0, Number(e.target.value) || 70)) })
                     }
                     className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -1874,8 +1881,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={config.isExamOpen}
-                  onChange={(e) => onUpdateConfig({ ...config, isExamOpen: e.target.checked })}
+                  checked={formConfig.isExamOpen}
+                  onChange={(e) => setFormConfig({ ...formConfig, isExamOpen: e.target.checked })}
                   className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-xs font-semibold text-slate-800">
@@ -1886,8 +1893,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={config.isRandomizeQuestions ?? true}
-                  onChange={(e) => onUpdateConfig({ ...config, isRandomizeQuestions: e.target.checked })}
+                  checked={formConfig.isRandomizeQuestions ?? formConfig.acakSoal ?? false}
+                  onChange={(e) => setFormConfig({ ...formConfig, acakSoal: e.target.checked, isRandomizeQuestions: e.target.checked })}
                   className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-xs font-semibold text-slate-800">

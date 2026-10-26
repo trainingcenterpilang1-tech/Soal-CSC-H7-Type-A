@@ -19,6 +19,7 @@ interface ExamConfig {
   durasiMenit: number;
   passingGrade: number;
   acakSoal: boolean;
+  isRandomizeQuestions?: boolean;
   judulUjian: string;
   lokasiCabang: string;
   isExamOpen: boolean;
@@ -40,6 +41,7 @@ const DEFAULT_EXAM_CONFIG: ExamConfig = {
   durasiMenit: 15,
   passingGrade: 70,
   acakSoal: false,
+  isRandomizeQuestions: false,
   judulUjian: 'Training CSCI H7',
   lokasiCabang: 'Indomaret Cabang Surabaya',
   isExamOpen: true,
@@ -209,11 +211,14 @@ app.post('/api/exam/config', (req: Request, res: Response) => {
     return res.status(400).json({ success: false, message: 'Data konfigurasi tidak valid.' });
   }
 
+  const isRandom = Boolean(config.isRandomizeQuestions ?? config.acakSoal ?? false);
+
   const updatedConfig: ExamConfig = {
-    durasiMenit: Math.max(1, Number(config.durasiMenit) || 20),
+    durasiMenit: Math.max(1, Number(config.durasiMenit) || 15),
     passingGrade: Math.min(100, Math.max(0, Number(config.passingGrade) || 70)),
-    acakSoal: Boolean(config.acakSoal),
-    judulUjian: typeof config.judulUjian === 'string' && config.judulUjian.trim() ? config.judulUjian.trim() : 'Training CSCI',
+    acakSoal: isRandom,
+    isRandomizeQuestions: isRandom,
+    judulUjian: typeof config.judulUjian === 'string' && config.judulUjian.trim() ? config.judulUjian.trim() : 'Training CSCI H7',
     lokasiCabang: typeof config.lokasiCabang === 'string' && config.lokasiCabang.trim() ? config.lokasiCabang.trim() : 'Indomaret Cabang Surabaya',
     isExamOpen: config.isExamOpen !== undefined ? Boolean(config.isExamOpen) : true,
   };
