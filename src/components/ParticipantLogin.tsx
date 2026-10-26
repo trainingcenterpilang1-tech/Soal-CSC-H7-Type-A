@@ -142,7 +142,7 @@ export const ParticipantLogin: React.FC<ParticipantLoginProps> = ({
           </div>
 
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white mb-2 leading-snug">
-            {examConfig.judulUjian || 'Training CSCI'}
+            {examConfig.judulUjian || 'Training CSCI H7'}
           </h1>
 
           <p className="text-xs text-blue-100/90 leading-relaxed mb-3">
@@ -151,7 +151,7 @@ export const ParticipantLogin: React.FC<ParticipantLoginProps> = ({
 
           <div className="inline-flex items-center gap-1.5 bg-blue-950/60 px-3 py-1.5 rounded-lg border border-blue-600/40 text-xs font-semibold text-amber-300">
             <Clock className="w-4 h-4 text-amber-400" />
-            <span>Durasi: <strong>{examConfig.durasiMenit} Menit</strong></span>
+            <span>Durasi: <strong>{examConfig.durasiMenit || 15} Menit</strong></span>
           </div>
         </div>
       </div>

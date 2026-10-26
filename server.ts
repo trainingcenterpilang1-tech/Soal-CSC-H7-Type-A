@@ -37,10 +37,10 @@ const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1Rxb_sZG
 const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmif0OC750DvnqekRcCSJ1JLNCmu--5Pe-pSaig78OL9oOPaFPxB9Cek45GyB8Mfx4/exec';
 
 const DEFAULT_EXAM_CONFIG: ExamConfig = {
-  durasiMenit: 20,
+  durasiMenit: 15,
   passingGrade: 70,
   acakSoal: false,
-  judulUjian: 'Training CSCI',
+  judulUjian: 'Training CSCI H7',
   lokasiCabang: 'Indomaret Cabang Surabaya',
   isExamOpen: true,
 };
@@ -80,6 +80,11 @@ function saveServerConfig(cfg: Partial<ServerConfig>): void {
   } catch (e) {
     console.warn('[Server] Error saving config file:', e);
   }
+}
+
+// Persist initial server config to file if it does not exist yet
+if (!fs.existsSync(CONFIG_FILE)) {
+  saveServerConfig(serverConfig);
 }
 
 function resolveScriptUrl(url?: string): string {

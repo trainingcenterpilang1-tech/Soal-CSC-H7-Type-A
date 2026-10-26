@@ -65,8 +65,9 @@ export interface ExamResult {
 
 export interface ExamConfig {
   durasiMenit: number;
-  passingGrade: number; // KKM, e.g. 75
+  passingGrade: number; // KKM, e.g. 70
   acakSoal: boolean;
+  isRandomizeQuestions?: boolean;
   judulUjian: string;
   lokasiCabang: string;
   isExamOpen: boolean;

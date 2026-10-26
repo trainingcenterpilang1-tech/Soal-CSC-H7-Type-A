@@ -149,7 +149,7 @@ export function buildGFormParams(result: ExamResult): URLSearchParams {
   params.append(GFORM_ENTRY_IDS.jenisTest, mapJenisTestToGForm(result.tipeUjian));
 
   // Answers 1 to 15
-  const ansMap = result.jawabanPerSoal || {};
+  const ansMap: Record<string | number, string> = result.jawabanPerSoal || {};
   for (let q = 1; q <= 15; q++) {
     const entryKey = GFORM_ENTRY_IDS.questions[q];
     if (entryKey) {
